@@ -1,0 +1,105 @@
+//引入依赖包
+     <dependency>
+            <groupId>org.apache.hadoop</groupId>
+            <artifactId>hadoop-hdfs</artifactId>
+            <version>2.4.0</version>
+     </dependency>
+     <dependency>
+            <groupId>org.apache.hadoop</groupId>
+            <artifactId>hadoop-common</artifactId>
+            <version>2.4.0</version>
+     </dependency>
+     <dependency>
+	    <groupId>org.apache.hadoop</groupId>
+	    <artifactId>hadoop-client</artifactId>
+	    <version>2.4.0</version>
+     </dependency>
+   
+//Mapper模块代码   
+package cn.demo.myfriend.data;
+
+import java.io.IOException;
+
+import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.LongWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.Mapper;
+
+public class MyMapper extends Mapper<LongWritable, Text, Text, IntWritable> {
+    
+	private final static IntWritable one=new IntWritable(1);
+	
+	@Override
+	protected void map(LongWritable key, Text value, Context context)
+			throws IOException, InterruptedException {
+		  String line=value.toString();
+		  //按规则拆分成数组
+		  String[] arry=line.split(",");
+		  String keyout=arry[1];
+		  context.write(new Text(keyout),one);
+	}
+}
+
+//Reducer模块代码
+package cn.demo.myfriend.data;
+
+import java.io.IOException;
+
+import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.Reducer;
+
+public class MyReducer extends Reducer<Text, IntWritable, Text, IntWritable> {
+    
+	private IntWritable result=new IntWritable();
+	@Override
+	protected void reduce(Text key, Iterable<IntWritable> values,
+			Context context) throws IOException, InterruptedException {
+		 int sum=0;
+		 for (IntWritable val : values) {
+			sum +=val.get();
+		}
+		 result.set(sum);
+		 context.write(key, result);
+	}
+}
+
+//driver模块
+package cn.demo.myfriend.data;
+
+import java.io.IOException;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+
+
+public class JobMain {
+   public static void main(String[] args) throws IOException, ClassNotFoundException, InterruptedException {
+	   Configuration conf =new Configuration();
+		//创建任务
+		Job job= Job.getInstance(conf);
+		//指定执行的map和Reduce的类
+		job.setMapperClass(MyMapper.class);
+		job.setReducerClass(MyReducer.class);
+		
+	    // 指定map和任务输出的类型
+		job.setMapOutputKeyClass(Text.class);
+		job.setMapOutputValueClass(IntWritable.class);
+		job.setOutputKeyClass(Text.class);
+		job.setOutputValueClass(IntWritable.class);
+		
+		//设置文件输出路径
+	    FileInputFormat.addInputPath(job,new Path("hdfs://172.80.2.207:9000/test/user_login.txt"));
+	    FileOutputFormat.setOutputPath(job,new Path("hdfs://172.80.2.207:9000/test/dataLogin"));
+	    
+	    boolean flag=job.waitForCompletion(true);
+   }
+}
+
+
+
